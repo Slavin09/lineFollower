@@ -1,240 +1,283 @@
-// Right Motor
-int enableRightMotor = 11;
-int rightMotorPin1 = 9;
-int rightMotorPin2 = 8;
+#define motor_R1 9
+#define motor_R2 8
+#define motor_L1 6
+#define motor_L2 7
+#define EnR 11
+#define EnL 10
 
-// Left Motor
-int enableLeftMotor = 10;
-int leftMotorPin1 = 7;
-int leftMotorPin2 = 6;
+int Sen0 = A5;
+int Sen1 = A4;
+int Sen2 = A3;
+int Sen3 = A2;
+int Sen4 = A1;
+int Sen5 = A0;
+int Sen6 = 4;
+int Sen7 = 5;
+int Weights[8]={-30, -20, -15, -5, 5, 15, 20, 30};
+int S[8];
 
-// IR Sensors
-int irSensorPin1 = 5;
-int irSensorPin2 = 4;
-int irSensorPin3 = A0;
-int irSensorPin4 = A1;
-int irSensorPin5 = A2;
-int irSensorPin6 = A3;
-int irSensorPin7 = A4;
-int irSensorPin8 = A5;
+int speed=255;
+float Kp= 8;
+float Ki=0;
+float Kd=20;
+float maxSpeed = 120;
 
-// LED Sensor
-int ledPin = 13;
+int error_dir=0;
 
-//Speed
-int speed = 50;
+int position_error=0;
+int I=0;
+int last_error=0;
+
+int turn_direction = 0;
 
 void setup() {
-  // Right Motor
-  pinMode(enableRightMotor, OUTPUT);
-  pinMode(rightMotorPin1, OUTPUT);
-  pinMode(rightMotorPin2, OUTPUT);
+  Serial.begin(9600);
 
-  // Left Motor
-  pinMode(enableLeftMotor, OUTPUT);
-  pinMode(leftMotorPin1, OUTPUT);
-  pinMode(leftMotorPin2, OUTPUT);
+  pinMode(motor_R1, OUTPUT);
+  pinMode(motor_R2, OUTPUT);
+  pinMode(motor_L1, OUTPUT);
+  pinMode(motor_L2, OUTPUT);
 
-  // IR Sensor
-  pinMode(irSensorPin1, INPUT);
-  pinMode(irSensorPin2, INPUT);
-  pinMode(irSensorPin3, INPUT);
-  pinMode(irSensorPin4, INPUT);
-  pinMode(irSensorPin5, INPUT);
-  pinMode(irSensorPin6, INPUT);
-  pinMode(irSensorPin7, INPUT);
-  pinMode(irSensorPin8, INPUT);
+  pinMode(Sen0, INPUT);
+  pinMode(Sen1, INPUT);
+  pinMode(Sen2, INPUT);
+  pinMode(Sen3, INPUT);
+  pinMode(Sen4, INPUT);
+  pinMode(Sen5, INPUT);
+  pinMode(Sen6, INPUT);
+  pinMode(Sen7, INPUT);
 
-  // LED Pin
-  pinMode(ledPin, OUTPUT);
+}
+
+
+void ReadSensor()
+{
+  S[0]=digitalRead(A5);
+  S[1]=digitalRead(A4);
+  S[2]=digitalRead(A3);
+  S[3]=digitalRead(A2);
+  S[4]=digitalRead(A1);
+  S[5]=digitalRead(A0);
+  S[6]=digitalRead(4);
+  S[7]=digitalRead(5);
+  // Serial.print(S[0]+"---");
+  // Serial.print(S[1]+"---");
+  // Serial.print(S[2]+"---");
+  // Serial.print(S[3]+"---");
+  // Serial.print(S[4]+"---");
+  // Serial.print(S[5]+"---");
+  // Serial.print(S[6]+"---");
+  // Serial.println(S[7]);
+  turn_direction=0;
+  if(S[0]==0 && S[1]==0)
+  turn_direction = -1;
+  if(S[7]==0 && S[6]==0)
+  turn_direction = 1;
+}
+void error()
+{
+  int position_error = 0;
+  for (int i = 0; i < 8; i++) {
+    position_error += S[i] * Weights[i]; //s[1]=1*-15=-15
+  }
+  // Serial.print(position_error);
+  //   Serial.print("---");
+    PID_Calc(position_error);
+    if(position_error>0 || position_error <0)
+    error_dir=position_error;
+}
+
+
+
+void PID_Calc(int error)
+{
+  float P_turn=Kp*error; //225
+  float D_adjust=Kd*(error-last_error);
+   //float Integral=Ki*(I+error);
+//   float PID= P_Turn+Integral+Derivative;
+  float PID=P_turn+D_adjust;
+last_error=error;
+/*if((S[0]==0 && S[1]==1 && S[2]==1 && S[3]==0 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0) || 
+  (S[0]==0 && S[1]==0 && S[2]==1 && S[3]==1 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0) || 
+  (S[0]==0 && S[1]==0 && S[2]==0 && S[3]==1 && S[4]==1 && S[5]==0 && S[6]==0 && S[7]==0) ||
+  (S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==1 && S[5]==1 && S[6]==0 && S[7]==0) ||
+  (S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==0 && S[5]==1 && S[6]==1 && S[7]==0)
+  { //Black surface, white line.*/
+    float  right_speed=speed - PID; //Change the polarity of P_turn if required.
+    float  left_speed=speed + PID;
+  /*}
+  else if(((S[0]==1 && S[1]==0 && S[2]==0 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1) ||  
+          (S[0]==1 && S[1]==1 && S[2]==0 && S[3]==0 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1) || 
+          (S[0]==1 && S[1]==1 && S[2]==1 && S[3]==0 && S[4]==0 && S[5]==1 && S[6]==1 && S[7]==1) ||
+          (S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==0 && S[5]==0 && S[6]==1 && S[7]==1) ||
+          (S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==0 && S[6]==0 && S[7]==1))
+          { //White surface, black line.
+    float right_speed=speed+P_turn; //Chnage the polarity of P_turn if required.
+    float left_speed=speed-P_turn;
+  }*/
+
+if(left_speed > maxSpeed)
+left_speed = maxSpeed;
+if(right_speed > maxSpeed)
+right_speed = maxSpeed;
+if(left_speed < -maxSpeed)
+left_speed = -maxSpeed;
+if(right_speed < -maxSpeed)
+right_speed = -maxSpeed;
+
+// Serial.print(left_speed);
+// Serial.print("---");
+// Serial.print(right_speed);
+// Serial.print("---");
+// Serial.println(P_turn);
+//Serial.print("---");
+//Serial.println(PID);
+rotateMotor(right_speed, left_speed);
+}
+
+void rotateMotor(float rightMotorSpeed, float leftMotorSpeed)
+{
+  
+  if (rightMotorSpeed < 0)
+  {
+    digitalWrite(motor_R1,LOW);
+    digitalWrite(motor_R2,HIGH);    
+  }
+  else if (rightMotorSpeed > 0)
+  {
+    digitalWrite(motor_R1,HIGH);
+    digitalWrite(motor_R2,LOW);      
+  }
+  else
+  {
+    digitalWrite(motor_R1,LOW);
+    digitalWrite(motor_R2,LOW);      
+  }
+
+  if (leftMotorSpeed < 0)
+  {
+    digitalWrite(motor_L1,LOW);
+    digitalWrite(motor_L2,HIGH);    
+  }
+  else if (leftMotorSpeed > 0)
+  {
+    digitalWrite(motor_L1,HIGH);
+    digitalWrite(motor_L2,LOW);      
+  }
+  else 
+  {
+    digitalWrite(motor_L1,LOW);
+    digitalWrite(motor_L2,LOW);      
+  }
+
+  if(turn_direction == 1){
+    // right
+    digitalWrite(motor_L1,HIGH);
+    digitalWrite(motor_L2, LOW);
+    digitalWrite(motor_R1,LOW);
+    digitalWrite(motor_R2,HIGH);
+    rightMotorSpeed = 100;
+    leftMotorSpeed = 100;
+  }
+
+  if(turn_direction == -1){
+    // left
+    digitalWrite(motor_L1, LOW);
+    digitalWrite(motor_L2, HIGH);
+    digitalWrite(motor_R1, HIGH);
+    digitalWrite(motor_R2, LOW);
+    rightMotorSpeed = 100;
+    leftMotorSpeed = 100;
+  }
+  analogWrite(EnR, abs(rightMotorSpeed));
+  analogWrite(EnL, abs(leftMotorSpeed));    
 }
 
 void loop() {
-  int irSensorValue1 = analogRead(irSensorPin1);
-  int irSensorValue2 = analogRead(irSensorPin2);
-  int irSensorValue3 = digitalRead(irSensorPin3);
-  int irSensorValue4 = digitalRead(irSensorPin4);
-  int irSensorValue5 = digitalRead(irSensorPin5);
-  int irSensorValue6 = digitalRead(irSensorPin6);
-  int irSensorValue7 = digitalRead(irSensorPin7);
-  int irSensorValue8 = digitalRead(irSensorPin8);
-
-  // Moving Forward
-  if((irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-    (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-    (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW)) {
-            digitalWrite(rightMotorPin1, HIGH);
-            digitalWrite(rightMotorPin2, LOW);
-            digitalWrite(leftMotorPin1, LOW);
-            digitalWrite(leftMotorPin2, HIGH);
-
-            analogWrite(enableRightMotor, speed);
-            analogWrite(enableLeftMotor, speed);
+  // put your main code here, to run repeatedly:  
+  ReadSensor();
+  error();
+  //PID_Calc();
+  if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1)
+  {
+    //digitalWrite(7, HIGH);
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(100);
+    //digitalWrite(7, LOW);
+    digitalWrite(LED_BUILTIN, LOW);
   }
+  
+  // if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1)
+  // {
+  //   rotateMotor(1, 1);
+  //   delay(2000);
+  //   //digitalWrite(7, HIGH);
+  //   digitalWrite(LED_BUILTIN, HIGH);
+  //   delay(200);
+  //   digitalWrite(LED_BUILTIN, LOW);
+  //   //digitalWrite(7, LOW);
+  // }
+  
+  //if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1)
+  //{
+      //if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1)
+      //{
+        // while(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1){
+          
+        //   Serial.println(error_dir);
+        // }
+        while(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1) {
+          ReadSensor();
+          OutofLine(error_dir);
+        }
+      //}
+  //}
+}
 
-  // Moving Right
-  else if((irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == HIGH && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == HIGH && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH)) {
-            digitalWrite(rightMotorPin1, LOW);
-            digitalWrite(rightMotorPin2, HIGH);
-            digitalWrite(leftMotorPin1, LOW);
-            digitalWrite(leftMotorPin2, HIGH);
+  // if(S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1)
+  // {
+  //   rotateMotor(-50,70);
+  // }
 
-            analogWrite(enableRightMotor, 60);
-            analogWrite(enableLeftMotor, 60);
-  }
+  // if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0)
+  // {
+  //   rotateMotor(70,-50);
+  // }
+  
+  // if(S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==0 && S[5]==1 && S[6]==1 && S[7]==1)
+  // {
+  //   rotateMotor(-50,70);
+  // }
 
-  // Moving Left
-  else if((irSensorValue1 == HIGH && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == LOW && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW)) {
-            digitalWrite(rightMotorPin1, HIGH);
-            digitalWrite(rightMotorPin2, LOW);
-            digitalWrite(leftMotorPin1, HIGH);
-            digitalWrite(leftMotorPin2, LOW);
+  // if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==0 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0)
+  // {
+  //   rotateMotor(70,-50);
+  // }
+  // if(S[0]==1 && S[1]==1 && S[2]==1 && S[3]==1 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0)
+  // {
+  //   rotateMotor(70,-50);
+  // }
+  // if(S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==1 && S[5]==1 && S[6]==1 && S[7]==1)
+  // {
+  //   rotateMotor(-50,70);
+  // }
 
-            analogWrite(enableRightMotor, speed);
-            analogWrite(enableLeftMotor, speed);
-  }
+  // if(S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==0 && S[5]==0 && S[6]==1 && S[7]==1)
+  // {
+  //   rotateMotor(70,-50);
+  // }
 
-  // Checkpoint Blink and Stop
-  else if((irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-          (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH) ||
-          (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH)) {
+  // if(S[0]==1 && S[1]==1 && S[2]==0 && S[3]==0 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0)
+  // {
+  //   rotateMotor(-50,70);
+  // }
 
-            // lED Blinks
-            digitalWrite(ledPin, HIGH);
-            delay(200);
-            digitalWrite(ledPin, LOW);
-            delay(200);
-
-            // Moves Forward to check if the line is a Checkpoint or not
-            digitalWrite(rightMotorPin1, HIGH);
-            digitalWrite(rightMotorPin2, LOW);
-            digitalWrite(leftMotorPin1, LOW);
-            digitalWrite(leftMotorPin2, HIGH);
-
-            analogWrite(enableRightMotor, speed);
-            analogWrite(enableLeftMotor, speed);
-
-            delay(100);
-
-            // Stops
-            if((irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-              (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == LOW && irSensorValue8 == LOW) ||
-              (irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-              (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-              (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == LOW) ||
-              (irSensorValue1 == LOW && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH) ||
-              (irSensorValue1 == HIGH && irSensorValue2 == HIGH && irSensorValue3 == HIGH && irSensorValue4 == HIGH && irSensorValue5 == HIGH && irSensorValue6 == HIGH && irSensorValue7 == HIGH && irSensorValue8 == HIGH)) {
-                  digitalWrite(ledPin, HIGH);
-                  delay(80);
-                  digitalWrite(ledPin, LOW);
-                  delay(80);
-                  digitalWrite(ledPin, HIGH);
-                  delay(80);
-                  digitalWrite(ledPin, LOW);
-                  delay(80);
-
-                  digitalWrite(rightMotorPin1, LOW);
-                  digitalWrite(rightMotorPin2, LOW);
-                  digitalWrite(leftMotorPin1, LOW);
-                  digitalWrite(leftMotorPin2, LOW);
-
-                  analogWrite(enableRightMotor, 0);
-                  analogWrite(enableLeftMotor, 0);
-              }
-    }
-
-    // White Space
-    else if(irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) {
-            // Moves Forward
-            digitalWrite(rightMotorPin1, HIGH);
-            digitalWrite(rightMotorPin2, LOW);
-            digitalWrite(leftMotorPin1, LOW);
-            digitalWrite(leftMotorPin2, HIGH);
-
-            analogWrite(enableRightMotor, speed);
-            analogWrite(enableLeftMotor, speed);
-
-            delay(200);
-
-            // If White Patch continues then Stops
-            if(irSensorValue1 == LOW && irSensorValue2 == LOW && irSensorValue3 == LOW && irSensorValue4 == LOW && irSensorValue5 == LOW && irSensorValue6 == LOW && irSensorValue7 == LOW && irSensorValue8 == LOW) {
-              // Moves Backword
-              digitalWrite(rightMotorPin1, LOW);
-              digitalWrite(rightMotorPin2, HIGH);
-              digitalWrite(leftMotorPin1, HIGH);
-              digitalWrite(leftMotorPin2, LOW);
-
-              analogWrite(enableRightMotor, speed);
-              analogWrite(enableLeftMotor, speed);
-
-              delay(150);
-
-              // Stops
-              digitalWrite(rightMotorPin1, LOW);
-              digitalWrite(rightMotorPin2, LOW);
-              digitalWrite(leftMotorPin1, LOW);
-              digitalWrite(leftMotorPin2, LOW);
-
-              analogWrite(enableRightMotor, 0);
-              analogWrite(enableLeftMotor, 0);
-            }
-    }
-    
-    else {
-      digitalWrite(rightMotorPin1, HIGH);
-      digitalWrite(rightMotorPin2, LOW);
-      digitalWrite(leftMotorPin1, LOW);
-      digitalWrite(leftMotorPin2, HIGH);
-
-      analogWrite(enableRightMotor, speed);
-      analogWrite(enableLeftMotor, speed);
-
-      /**
-      digitalWrite(rightMotorPin1, LOW);
-      digitalWrite(rightMotorPin2, LOW);
-      digitalWrite(leftMotorPin1, LOW);
-      digitalWrite(leftMotorPin2, LOW);
-
-      analogWrite(enableRightMotor, 0);
-      analogWrite(enableLeftMotor, 0);
-      */
-    }
+  // if(S[0]==0 && S[1]==0 && S[2]==0 && S[3]==0 && S[4]==0 && S[5]==0 && S[6]==0 && S[7]==0)
+  // {
+  //   rotateMotor(0,0);
+  // }
+void OutofLine(int turn)
+{
+  Serial.println("---");
+  PID_Calc(-turn);
 }
